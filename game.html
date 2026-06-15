@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>重生之门 · 辟谣追缉</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; }
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  background: #07070f; color: #e8e8f0;
+  min-height: 100vh; overflow-x: hidden; position: relative;
+  line-height: 1.6;
+}
+#particleCanvas {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0; pointer-events: none;
+}
+.vignette {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%);
+  z-index: 1; pointer-events: none;
+}
+.sweepLight {
+  position: fixed; top: 0; left: -100%; width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,212,112,0.03), transparent);
+  animation: sweep 10s linear infinite; z-index: 1; pointer-events: none;
+}
+@keyframes sweep { 0%{left:-50%} 100%{left:150%} }
+
+/* 通用 */
+.glassPanel {
+  background: rgba(18,18,32,0.85); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,212,112,0.12);
+  border-radius: 14px; padding: 20px;
+  position: relative; z-index: 10;
+}
+.glowTitle {
+  font-size: 2rem; font-weight: 700; color: #ffd470;
+  text-shadow: 0 0 20px rgba(255,212,112,0.3);
+  letter-spacing: 3px; text-align: center;
+}
+.subtitle { color: #6bb6ff; font-size: 0.9rem; text-align: center; margin-top: 6px; letter-spacing: 2px; }
+.btn {
+  display: inline-block; padding: 12px 28px;
+  border: 1px solid rgba(255,212,112,0.35);
+  background: rgba(255,212,112,0.06); color: #ffd470;
+  font-size: 0.95rem; border-radius: 8px; cursor: pointer;
+  transition: all 0.25s ease; letter-spacing: 1px;
+  position: relative; z-index: 10; text-align: center;
+}
+.btn:hover { transform: scale(1.02); border-color: #ffd470; box-shadow: 0 0 16px rgba(255,212,112,0.25); }
+.btn:active { transform: scale(0.97); }
+
+/* 屏幕 */
+.screen {
+  display: none; min-height: 100vh; padding: 16px;
+  position: relative; z-index: 10;
+}
+.screen.active { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 60px; }
+
+/* 开场 */
+.openingScene { text-align: center; max-width: 600px; width: 100%; }
+.openingScene .glowTitle { font-size: 2.4rem; margin-bottom: 8px; }
+.storyIntro { color: #b0b0c8; line-height: 1.9; font-size: 0.9rem; margin: 20px 0; text-align: left; padding: 16px; border-left: 2px solid rgba(255,212,112,0.25); }
+.openingButtons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+
+/* 人物档案 */
+.charGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 600px; width: 100%; margin-top: 16px; }
+.charCard { background: rgba(18,18,32,0.85); backdrop-filter: blur(20px); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); transition: all 0.25s ease; cursor: pointer; }
+.charCard:hover { transform: translateY(-3px); border-color: rgba(255,212,112,0.2); }
+.charAvatar { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; }
+.charName { font-size: 1rem; font-weight: 600; margin-bottom: 2px; }
+.charRole { font-size: 0.75rem; opacity: 0.65; margin-bottom: 6px; }
+.charDesc { font-size: 0.75rem; color: #a0a0b8; line-height: 1.5; }
+
+/* 关卡选择 */
+.levelGrid { display: grid; grid-template-columns: 1fr; gap: 12px; max-width: 500px; width: 100%; margin-top: 20px; }
+.levelCard { background: rgba(18,18,32,0.85); backdrop-filter: blur(20px); border-radius: 12px; padding: 20px 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); transition: all 0.25s ease; cursor: pointer; display: flex; align-items: center; gap: 16px; }
+.levelCard:hover:not(.locked) { border-color: rgba(255,212,112,0.3); }
+.levelCard.locked { opacity: 0.35; cursor: not-allowed; filter: grayscale(0.8); }
+.levelCard.cleared { border-color: rgba(74,222,128,0.3); }
+.levelNum { font-size: 2rem; font-weight: 700; min-width: 50px; }
+.levelInfo { text-align: left; flex: 1; }
+.levelTitle { font-size: 1rem; margin-bottom: 2px; }
+.levelSub { font-size: 0.8rem; color: #a0a0b8; }
+.levelDiff { font-size: 0.75rem; padding: 3px 10px; border-radius: 10px; display: inline-block; margin-top: 4px; }
+.diffEasy { background: rgba(74,222,128,0.12); color: #4ade80; }
+.diffMedium { background: rgba(255,212,112,0.12); color: #ffd470; }
+.diffHard { background: rgba(255,107,107,0.12); color: #ff6b6b; }
+
+/* 游戏界面 */
+.gameHeader { display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 600px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.statBar { display: flex; gap: 12px; align-items: center; }
+.statItem { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+.statLabel { opacity: 0.6; font-size: 0.75rem; }
+.statValue { font-weight: 600; font-size: 1rem; }
+.lightVal { color: #ffd470; } .darkVal { color: #ff6b6b; } .trustVal { color: #6bb6ff; }
+.timer { font-size: 1.3rem; font-weight: 700; color: #ffd470; font-variant-numeric: tabular-nums; transition: color 0.3s; background: rgba(0,0,0,0.3); padding: 4px 12px; border-radius: 8px; }
+.timer.warning { color: #ff6b6b; animation: pulse 0.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.progressBar { width: 100%; max-width: 600px; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+.progressFill { height: 100%; background: linear-gradient(90deg, #ffd470, #6bb6ff); border-radius: 2px; transition: width 0.4s ease; }
+
+/* 场景 */
+.sceneArea { width: 100%; max-width: 600px; margin-bottom: 12px; }
+.sceneHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sceneIcon { font-size: 1.3rem; }
+.sceneTitle { font-size: 1rem; color: #6bb6ff; }
+.sceneNum { color: #a0a0b8; font-size: 0.8rem; margin-left: auto; }
+.sceneDesc { color: #a0a0b8; font-size: 0.85rem; line-height: 1.5; margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; }
+
+/* 对话 */
+.dialogueArea { width: 100%; max-width: 600px; margin-bottom: 12px; }
+.dialogueBubble { padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; position: relative; max-width: 90%; font-size: 0.88rem; line-height: 1.6; }
+.dialogueBubble.left { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.15); margin-right: auto; border-bottom-left-radius: 3px; }
+.dialogueBubble.right { background: rgba(107,182,255,0.08); border: 1px solid rgba(107,182,255,0.15); margin-left: auto; border-bottom-right-radius: 3px; }
+.dialogueSpeaker { font-size: 0.75rem; font-weight: 600; margin-bottom: 2px; opacity: 0.7; }
+.dialogueBubble.left .dialogueSpeaker { color: #ff6b6b; }
+.dialogueBubble.right .dialogueSpeaker { color: #6bb6ff; }
+
+/* 题目 */
+.questionArea { width: 100%; max-width: 600px; margin-bottom: 12px; }
+.questionText { font-size: 1rem; line-height: 1.7; padding: 16px; background: rgba(0,0,0,0.25); border-radius: 10px; border-left: 3px solid #ffd470; margin-bottom: 16px; }
+.answerButtons { display: flex; gap: 12px; justify-content: center; }
+.answerBtn { flex: 1; padding: 14px; font-size: 1rem; border-radius: 10px; cursor: pointer; transition: all 0.25s ease; border: 2px solid; font-weight: 600; letter-spacing: 1px; text-align: center; }
+.answerBtn:hover { transform: scale(1.02); }
+.answerBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btnReal { border-color: #4ade80; background: rgba(74,222,128,0.08); color: #4ade80; }
+.btnReal:hover { background: rgba(74,222,128,0.15); }
+.btnFake { border-color: #ff6b6b; background: rgba(255,107,107,0.08); color: #ff6b6b; }
+.btnFake:hover { background: rgba(255,107,107,0.15); }
+
+/* 解析 */
+.analysisPanel { width: 100%; max-width: 600px; margin-top: 16px; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.analysisSection { margin-bottom: 12px; padding: 14px; border-radius: 10px; font-size: 0.88rem; line-height: 1.7; }
+.analysisSection h4 { margin-bottom: 6px; font-size: 0.95rem; }
+.analysisCorrect { background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.15); }
+.analysisCorrect h4 { color: #4ade80; }
+.analysisWrong { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.15); }
+.analysisWrong h4 { color: #ff6b6b; }
+.analysisTip { background: rgba(255,212,112,0.06); border: 1px solid rgba(255,212,112,0.15); }
+.analysisTip h4 { color: #ffd470; }
+.analysisLaw { background: rgba(107,182,255,0.05); border: 1px solid rgba(107,182,255,0.15); }
+.analysisLaw h4 { color: #6bb6ff; }
+
+/* 抉择面板 */
+.choicePanel { width: 100%; max-width: 600px; margin-top: 16px; animation: fadeIn 0.4s ease; }
+.choiceTitle { font-size: 1.05rem; color: #ffd470; margin-bottom: 14px; text-align: center; font-weight: 600; }
+.choiceButtons { display: flex; flex-direction: column; gap: 10px; }
+.choiceBtn { width: 100%; padding: 14px 16px; border-radius: 10px; cursor: pointer; transition: all 0.25s ease; text-align: left; font-size: 0.9rem; line-height: 1.5; border: 1.5px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.04); color: #e0e0e8; }
+.choiceBtn:hover { border-color: rgba(255,212,112,0.4); background: rgba(255,212,112,0.06); transform: translateX(4px); }
+.choiceBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* 结算 */
+.resultPanel { text-align: center; max-width: 500px; width: 100%; margin-top: 40px; }
+.resultTitle { font-size: 1.8rem; margin-bottom: 20px; }
+.resultTitle.pass { color: #4ade80; }
+.resultTitle.fail { color: #ff6b6b; }
+.resultStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+.resultStat { padding: 14px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+.resultStatNum { font-size: 1.8rem; font-weight: 700; margin-bottom: 2px; }
+.resultStatLabel { font-size: 0.8rem; opacity: 0.6; }
+.resultMessage { color: #b0b0c8; line-height: 1.8; margin: 16px 0; font-size: 0.9rem; }
+.resultButtons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+
+/* 结局 */
+.endingScene { text-align: center; max-width: 600px; width: 100%; margin-top: 20px; }
+.endingTitle { font-size: 2rem; margin-bottom: 12px; }
+.endingTitle.light { color: #ffd470; text-shadow: 0 0 25px rgba(255,212,112,0.4); }
+.endingTitle.neutral { color: #a0a0b0; }
+.endingTitle.dark { color: #ff6b6b; text-shadow: 0 0 25px rgba(255,107,107,0.3); }
+.endingStory { color: #c0c0d8; line-height: 2; font-size: 0.9rem; margin: 20px 0; text-align: left; padding: 20px; background: rgba(0,0,0,0.25); border-radius: 10px; }
+.endingQuote { font-style: italic; color: #ffd470; font-size: 1rem; margin: 20px 0; padding: 16px; border-left: 3px solid #ffd470; text-align: left; background: rgba(255,212,112,0.04); }
+.endingStats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0; width: 100%; }
+.endingStat { padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; text-align: center; }
+.endingStatValue { font-size: 1.3rem; font-weight: 700; }
+.endingStatLabel { font-size: 0.75rem; opacity: 0.6; margin-top: 2px; }
+.reportPanel { width: 100%; margin-top: 16px; padding: 20px; background: rgba(107,182,255,0.04); border: 1px solid rgba(107,182,255,0.15); border-radius: 10px; }
+.reportTitle { color: #6bb6ff; font-size: 1.1rem; margin-bottom: 12px; text-align: center; font-weight: 600; }
+.reportContent { color: #b0b0c8; line-height: 1.8; font-size: 0.85rem; }
+
+/* 反馈动画 */
+.feedback { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3.5rem; z-index: 100; animation: feedbackPop 0.7s ease forwards; pointer-events: none; }
+@keyframes feedbackPop { 0%{opacity:0;transform:translate(-50%,-50%) scale(0.4)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.1)} 100%{opacity:0;transform:translate(-50%,-50%) scale(1.4)} }
+
+/* 分页提示 */
+.pageHint { text-align: center; color: #6bb6ff; font-size: 0.8rem; margin: 12px 0; opacity: 0.7; }
+
+/* 响应式 */
+@media (max-width: 480px) {
+  html { font-size: 15px; }
+  .glowTitle { font-size: 1.6rem; }
+  .openingScene .glowTitle { font-size: 2rem; }
+  .charGrid { grid-template-columns: 1fr; }
+  .answerButtons { flex-direction: column; }
+  .resultStats { grid-template-columns: 1fr; }
+  .endingStats { grid-template-columns: 1fr; }
+  .screen.active { padding-top: 40px; }
+  .questionText { font-size: 0.95rem; padding: 12px; }
+  .analysisSection { padding: 12px; font-size: 0.85rem; }
+  .dialogueBubble { font-size: 0.85rem; padding: 8px 12px; }
+}
+</style>
+</head>
+<body>
+<canvas id="particleCanvas"></canvas>
+<div class="vignette"></div>
+<div class="sweepLight"></div>
+
+<!-- 1. 开场 -->
+<div id="screenOpening" class="screen active">
+  <div class="openingScene glassPanel">
+    <div class="glowTitle">重生之门</div>
+    <div class="subtitle">辟谣追缉</div>
+    <div class="storyIntro">
+      <p>十二年前，庄耀柏在洛神案中失踪，留下儿子庄文杰独自面对世界的黑暗与光明。</p>
+      <p>如今，丁生火以"父亲下落"为诱饵，将庄文杰拉入骗局；刑侦队长罗坚试图将他引向正途；而幕后黑手"先生"许正清，正一步步将他推向深渊……</p>
+      <p style="margin-top:10px;color:#ffd470;">⚡ 在真假信息的迷雾中，你的每一个选择，都将决定庄文杰的命运。</p>
+    </div>
+    <div class="openingButtons">
+      <button class="btn" onclick="showScreen('screenCharacters')">📋 人物档案</button>
+      <button class="btn" onclick="startGame()">🎮 开始游戏</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2. 人物档案 -->
+<div id="screenCharacters" class="screen">
+  <div style="text-align:center;margin-bottom:16px;">
+    <div class="glowTitle" style="font-size:1.6rem;">人物档案</div>
+  </div>
+  <div class="charGrid">
+    <div class="charCard">
+      <div class="charAvatar" style="background:linear-gradient(135deg,#1a3a5c,#4a90d9);">👤</div>
+      <div class="charName" style="color:#4a90d9;">庄文杰</div>
+      <div class="charRole">法律系学生 / 玩家角色</div>
+      <div class="charDesc">庄耀柏之子，聪明敏感，对真相有执念。你的选择决定他的命运。</div>
+    </div>
+    <div class="charCard">
+      <div class="charAvatar" style="background:linear-gradient(135deg,#5c4a2a,#c4a77d);">🕵️</div>
+      <div class="charName" style="color:#c4a77d;">罗坚</div>
+      <div class="charRole">刑侦队长 / 光明引导者</div>
+      <div class="charDesc">正直果敢，追查洛神案多年。相信庄文杰内心的光明。</div>
+    </div>
+    <div class="charCard">
+      <div class="charAvatar" style="background:linear-gradient(135deg,#3c1a1a,#8b0000);">🎭</div>
+      <div class="charName" style="color:#ff6b6b;">丁生火</div>
+      <div class="charRole">"暗流"成员 / 黑暗诱惑者</div>
+      <div class="charDesc">犯罪老手，利用庄文杰对父亲的执念设下圈套。</div>
+    </div>
+    <div class="charCard">
+      <div class="charAvatar" style="background:linear-gradient(135deg,#2a1a4a,#6a4a9a);">👓</div>
+      <div class="charName" style="color:#9a7ad9;">许正清</div>
+      <div class="charRole">幕后"先生" / 终极反派</div>
+      <div class="charDesc">庄耀柏的"师兄"，擅长用虚假信息和法律陷阱操控他人。</div>
+    </div>
+  </div>
+  <div style="margin-top:20px;"><button class="btn" onclick="showScreen('screenOpening')">← 返回</button></div>
+</div>
+
+<!-- 3. 关卡选择 -->
+<div id="screenLevels" class="screen">
+  <div style="text-align:center;margin-bottom:12px;">
+    <div class="glowTitle" style="font-size:1.6rem;">关卡选择</div>
+    <div class="subtitle">选择你的追缉之路</div>
+  </div>
+  <div class="levelGrid">
+    <div class="levelCard" id="level1" onclick="selectLevel(0)">
+      <div class="levelNum" style="color:#4ade80;">01</div>
+      <div class="levelInfo">
+        <div class="levelTitle">新闻迷雾</div>
+        <div class="levelSub">丁生火的罗网 · 新闻类谣言</div>
+        <div class="levelDiff diffEasy">入门难度</div>
+      </div>
+    </div>
+    <div class="levelCard locked" id="level2" onclick="selectLevel(1)">
+      <div class="levelNum" style="color:#ffd470;">02</div>
+      <div class="levelInfo">
+        <div class="levelTitle">法网暗涌</div>
+        <div class="levelSub">许正清的棋局 · 法律陷阱</div>
+        <div class="levelDiff diffMedium">进阶难度</div>
+      </div>
+    </div>
+    <div class="levelCard locked" id="level3" onclick="selectLevel(2)">
+      <div class="levelNum" style="color:#ff6b6b;">03</div>
+      <div class="levelInfo">
+        <div class="levelTitle">终极真相</div>
+        <div class="levelSub">重生之门 · 剧情综合</div>
+        <div class="levelDiff diffHard">终极难度</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:20px;"><button class="btn" onclick="showScreen('screenOpening')">← 返回主页</button></div>
+</div>
+
+<!-- 4. 游戏答题 -->
+<div id="screenGame" class="screen">
+  <div class="gameHeader">
+    <div class="statBar">
+      <div class="statItem"><span class="statLabel">光明</span><span class="statValue lightVal" id="gameLightVal">50</span></div>
+      <div class="statItem"><span class="statLabel">黑暗</span><span class="statValue darkVal" id="gameDarkVal">0</span></div>
+      <div class="statItem"><span class="statLabel">信任</span><span class="statValue trustVal" id="gameTrustVal">50</span></div>
+    </div>
+    <div class="timer" id="gameTimer">20</div>
+  </div>
+  <div class="progressBar"><div class="progressFill" id="gameProgress" style="width:0%"></div></div>
+  <div class="sceneArea" id="gameScene"></div>
+  <div class="dialogueArea" id="gameDialogue"></div>
+  <div class="questionArea" id="gameQuestion"></div>
+  <div id="gameChoicePanel"></div>
+  <div id="gameAnalysis"></div>
+</div>
+
+<!-- 5. 关卡结算 -->
+<div id="screenResult" class="screen">
+  <div class="resultPanel glassPanel">
+    <div class="resultTitle" id="resultTitle">关卡结算</div>
+    <div class="resultStats">
+      <div class="resultStat"><div class="resultStatNum" id="resultCorrect" style="color:#4ade80;">0</div><div class="resultStatLabel">答对</div></div>
+      <div class="resultStat"><div class="resultStatNum" id="resultWrong" style="color:#ff6b6b;">0</div><div class="resultStatLabel">答错</div></div>
+      <div class="resultStat"><div class="resultStatNum" id="resultLight" style="color:#ffd470;">50</div><div class="resultStatLabel">光明值</div></div>
+    </div>
+    <div class="resultMessage" id="resultMessage"></div>
+    <div class="resultButtons" id="resultButtons"></div>
+  </div>
+</div>
+
+<!-- 6. 结局界面 -->
+<div id="screenEnding" class="screen">
+  <div class="endingScene">
+    <div class="endingTitle" id="endingTitle"></div>
+    <div class="endingStory" id="endingStory"></div>
+    <div class="endingQuote" id="endingQuote"></div>
+    <div class="endingStats" id="endingStats"></div>
+    <div class="reportPanel" id="reportPanel"></div>
+    <div style="margin-top:20px;"><button class="btn" onclick="restartGame()">🔄 重新开始</button></div>
+  </div>
+</div>
+
+<script>
+
+// ===== 游戏状态 =====
+let gameState = {
+  lightVal: 50, darkVal: 0, trustVal: 50,
+  currentLevel: 0, currentQuestion: 0,
+  correctCount: 0, wrongCount: 0,
+  timer: null, timeLeft: 20,
+  levelCleared: [false, false, false],
+  choices: { light: 0, dark: 0, neutral: 0 },
+  mistakeTypes: { emotional: 0, fear: 0, authority: 0, profit: 0, legal: 0 },
+  waitingForNext: false,
+  showingChoice: false  // 新增：是否正在显示抉择页面
+};
+
+// ===== 关卡数据 =====
+const levels = [{name: "新闻迷雾", subtitle: "丁生火的罗网", difficulty: "入门", color: "#4ade80", questions: [{scene: {icon: "📱", title: "入局", desc: "你收到一条陌生短信，发信人声称知道你父亲庄耀柏的下落。"}, text: "庄文杰，你父亲庄耀柏还活着，但警方说他死了。想知道真相？帮我做一件事，把《睡莲》送到指定地点。这是真实的交易，不是犯罪。——丁生火", isFake: true, analysis: "丁生火利用你对父亲下落的渴望进行情感操控。所谓'真实的交易'是将违法行为包装成合理交易。警方对庄耀柏的调查结论是公开的，丁生火只是在利用信息不对称。", tip: "当有人用'你关心的人'作为筹码要求你做事时，先验证信息来源，不要因情感冲动做出违法决定。", lawRef: "《刑法》第264条：盗窃公私财物，数额较大的，处三年以下有期徒刑。", characters: [{name: "丁生火", side: "dark", dialog: "你父亲的事，只有我知道。警方只会隐瞒。"}, {name: "罗坚", side: "light", dialog: "任何要求你隐瞒警方的'交易'都可能是陷阱。"}], choice: {light: {text: "告诉罗坚这条信息，配合警方调查", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "答应丁生火，隐瞒警方独自行动", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不答应也不举报，自己暗中调查", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "emotional"}, {scene: {icon: "📰", title: "舆论操控", desc: "网络热搜出现一条爆炸性新闻。"}, text: "某知名艺人因偷税漏税被判死刑，其工作室已发布声明证实。该艺人名下所有资产已被冻结，家属面临株连。", isFake: true, analysis: "根据《刑法》第201条，逃税罪最高处7年有期徒刑，且需满足'数额巨大+占应纳税额30%以上'条件。'死刑'说法完全错误，属于夸大其词制造恐慌。", tip: "涉及'死刑'的谣言往往利用公众对法律的无知，看到'判死刑'先查刑法条文。", lawRef: "《刑法》第201条：逃税罪最高处七年有期徒刑。", characters: [{name: "丁生火", side: "dark", dialog: "一条假消息能让一个人社会性死亡。学会利用它，你就能控制局面。"}, {name: "罗坚", side: "light", dialog: "偷税是经济犯罪，最高刑罚是有期徒刑，不是死刑。"}], choice: null, type: "authority"}, {scene: {icon: "💧", title: "健康陷阱", desc: "许正清在修表店向你透露'生财之道'。"}, text: "长期饮用碱性水可以中和体内酸性体质，有效预防癌症。这是最新的医学研究成果，某健康博主已验证，售价仅298元/箱。", isFake: true, analysis: "'酸碱体质理论'创始人已被美国法院判赔1.05亿美元，承认是骗局。人体血液pH值稳定在7.35-7.45，任何食物或饮水都无法改变。", tip: "看到'中和体质''预防癌症'等医学宣称，先查证是否有权威医学期刊支持。", lawRef: "《广告法》第17条：禁止其他任何广告涉及疾病治疗功能。", characters: [{name: "许正清", side: "dark", dialog: "信息就是财富。真假不重要，重要的是有人愿意为它付费。"}, {name: "罗坚", side: "light", dialog: "你体内的酸碱平衡由肾脏和肺自动调节，不需要'碱性水'。"}], choice: {light: {text: "质疑这是伪科学，拒绝参与", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认同'信息可以卖钱'，参与推销", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不表态，默默记录但不参与", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "profit"}, {scene: {icon: "😷", title: "科技恐慌", desc: "校园群聊里疯传一条'紧急通知'。"}, text: "紧急通知！口罩鼻梁条内嵌5G天线，会追踪你的位置并收集DNA数据。已有技术人员拆解证实，请立即停止使用并转发！", isFake: true, analysis: "口罩鼻梁条是包裹塑料皮的铁丝/铝条，仅用于塑形。5G天线需要射频芯片、基带处理器、电源管理等复杂组件，无法以'铁丝'形式存在。", tip: "看到'XX产品内含高科技追踪装置'，先思考：它需要电源吗？需要信号发射吗？体积够吗？", lawRef: "《治安管理处罚法》第25条：散布谣言，处五日以上十日以下拘留。", characters: [{name: "丁生火", side: "dark", dialog: "人们害怕自己不懂的技术。记住，恐惧是最好的控制工具。"}, {name: "罗坚", side: "light", dialog: "那是铁丝，用来塑形固定的。5G天线不可能藏在铁丝里。"}], choice: null, type: "fear"}, {scene: {icon: "♻️", title: "政策误导", desc: "社区公告栏贴出'新规'。"}, text: "国家新规：所有小区必须立即实施垃圾分类，违者个人罚款5000元，物业罚款10万元。下月起执行！", isFake: true, analysis: "《生活垃圾分类标志》标准是倡导性文件，非强制性法律。各地处罚标准不同，但个人首次违规通常以教育为主，罚款远低于5000元（如上海最高200元）。", tip: "政策类谣言常用'必须立即''违者罚款XX'等绝对化表述，应去政府官网核实。", lawRef: "各地《生活垃圾管理条例》处罚标准不同，需具体查询。", characters: [{name: "许正清", side: "dark", dialog: "政策谣言最妙，因为没人会真的去查文件。"}, {name: "罗坚", side: "light", dialog: "垃圾分类是倡导性政策，个人违规通常先警告教育。"}], choice: null, type: "authority"}, {scene: {icon: "🌍", title: "地震预警", desc: "地震预警群里出现官方消息。"}, text: "【中国地震台网正式测定】6月14日21时15分，四川某地发生4.2级地震，震源深度10千米。震中周边20公里内无大型城镇，暂无人员伤亡报告。地震预警系统已提前10秒向周边用户发出预警。", isFake: false, analysis: "这是真实的地震速报信息。中国地震台网是官方地震信息发布机构，地震预警系统确实能在震后数秒内发出预警。信息包含精确的时间、地点、震级和震源深度，格式规范。", tip: "官方地震信息有精确参数和发布机构，'精确到小时'的预报是假的，但'震后速报'是真实的。", lawRef: "《防震减灾法》第29条：地震预报意见由省级以上政府发布，但地震速报由地震工作部门即时发布。", characters: [{name: "罗坚", side: "light", dialog: "地震台网的速报是真实的，预警系统确实能提前几秒到几十秒发出警报。"}, {name: "丁生火", side: "dark", dialog: "官方说没伤亡就真没伤亡？谁知道是不是在隐瞒。"}], choice: null, type: "authority"}, {scene: {icon: "🚨", title: "紧急预警", desc: "气象局发布了一条官方预警信息。"}, text: "市气象局发布暴雨红色预警信号：预计未来3小时内，我市部分地区降雨量将达100毫米以上，并伴有雷电和短时大风。请市民注意防范，避免外出。", isFake: false, analysis: "这是真实的官方预警信息。暴雨红色预警是气象部门根据实时监测数据发布的最高级别暴雨预警，具有法律效力，相关单位和市民应配合应急响应。", tip: "官方预警信息有明确发布单位、预警级别和具体措施，可通过政府官网或官方APP验证。", lawRef: "《气象法》第22条：县级以上气象主管机构所属的气象台站应当统一发布公众气象预报和灾害性天气警报。", characters: [{name: "罗坚", side: "light", dialog: "气象局发布的预警是真实的，暴雨红色预警意味着极端危险，必须重视。"}, {name: "丁生火", side: "dark", dialog: "官方预警？谁知道是不是又在制造恐慌。"}], choice: null, type: "authority"}, {scene: {icon: "💊", title: "药品召回", desc: "国家药监局发布了一则公告。"}, text: "国家药品监督管理局公告：某批次感冒胶囊经检验发现有效成分含量不符合标准，现决定召回该批次产品。消费者可凭购买凭证全额退款，已服用者如有不适请及时就医。", isFake: false, analysis: "这是真实的药品召回公告。国家药监局有权对不合格药品采取召回措施，公告包含具体批次、处理方式和救济途径，格式规范，信息完整。", tip: "官方召回公告会明确产品批次号、召回原因、处理方式和联系方式，可通过药监局官网验证。", lawRef: "《药品管理法》第82条：药品存在质量问题或者其他安全隐患的，药品上市许可持有人应当立即停止销售，召回已销售的药品。", characters: [{name: "罗坚", side: "light", dialog: "药监局召回公告是真实的，这是保护消费者的正常监管行为。"}, {name: "许正清", side: "dark", dialog: "谁知道是不是竞争对手搞的鬼？官方公告也不一定可信。"}], choice: {light: {text: "检查家中药品批次，配合召回", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认为这是商业阴谋，拒绝配合", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不检查也不配合，认为与自己无关", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "authority"}, {scene: {icon: "📢", title: "反诈宣传", desc: "派出所社区民警发来一条提醒。"}, text: "【反诈提醒】近期出现冒充公检法人员诈骗案件，骗子以'涉嫌洗钱''账户异常'为由要求转账到'安全账户'。请记住：公检法机关不会通过电话、网络要求转账，不存在'安全账户'。如遇此类电话，请立即挂断并拨打110核实。", isFake: false, analysis: "这是真实的反诈宣传信息。'冒充公检法'是常见电信诈骗类型，公检法机关确实不会通过电话要求转账，'安全账户'是诈骗分子的经典话术。", tip: "官方反诈提醒会明确告知'不会做什么'，而非要求你'必须做什么'。遇到转账要求，先挂断再核实。", lawRef: "《刑法》第266条：诈骗公私财物，数额较大的，处三年以下有期徒刑。", characters: [{name: "罗坚", side: "light", dialog: "这是标准的反诈宣传，公检法确实不会要求转账到安全账户。"}, {name: "丁生火", side: "dark", dialog: "谁知道这是不是另一种控制？官方说不能转的，也许正是你应该查的。"}], choice: null, type: "authority"}, {scene: {icon: "🏥", title: "医保新规", desc: "医保局发布了一项便民政策。"}, text: "国家医保局通知：自本月起，城乡居民医保门诊费用纳入报销范围，年度最高支付限额为2000元。参保人员持医保卡到定点医疗机构就诊即可直接结算，无需额外申请。", isFake: false, analysis: "这是真实的医保政策调整。近年来国家持续推进门诊共济保障改革，将普通门诊费用纳入医保报销是真实政策，具体限额因地区而异。", tip: "医保政策调整会通过政府官网、官方媒体发布，包含具体实施时间和操作方式，可通过12333热线或医保局官网核实。", lawRef: "《社会保险法》第28条：符合基本医疗保险药品目录、诊疗项目等的医疗费用，按照国家规定从基本医疗保险基金中支付。", characters: [{name: "罗坚", side: "light", dialog: "医保门诊报销是真实政策，这是惠民措施，可以直接去医院咨询。"}, {name: "许正清", side: "dark", dialog: "医保基金都快破产了，还报销门诊？这消息有问题。"}], choice: {light: {text: "去医院咨询具体报销流程", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认为这是虚假政策，散布质疑", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不关注，认为与自己无关", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "authority"}, {scene: {icon: "🎨", title: "丁生火的最后通牒", desc: "金库行动前夜，丁生火发来最后的信息。"}, text: "庄文杰，明天的行动很简单：把画送进去，按下按钮，然后离开。警方不会知道你的存在。你父亲当年也是这样做的——他选择了'真相'而不是'法律'。", isFake: true, analysis: "庄耀柏是被胁迫参与洛神案，并非主动选择'黑暗'。丁生火将'被迫犯罪'美化为'选择真相'，是在诱导庄文杰认同犯罪逻辑。所谓'警方不会知道'也是谎言。", tip: "当有人将'犯罪'美化为'选择真相'时，要警惕——真相不需要通过违法来获取。", lawRef: "《刑法》第264条：盗窃数额特别巨大的，处十年以上有期徒刑或无期徒刑。", characters: [{name: "丁生火", side: "dark", dialog: "你父亲选择了黑暗，所以他知道了真相。你也可以。"}, {name: "罗坚", side: "light", dialog: "无论丁生火说什么，记住：你父亲不是罪犯。别让他定义你。"}], choice: {light: {text: "向罗坚坦白一切，配合抓捕丁生火", lightVal: 15, trustVal: 10, darkVal: 0}, dark: {text: "按丁生火计划行动，抽氧前逃离", lightVal: -15, trustVal: -15, darkVal: 20}, neutral: {text: "去现场但不参与，旁观等待", lightVal: 0, trustVal: -10, darkVal: 0}}, type: "emotional"}]}, {name: "法网暗涌", subtitle: "许正清的棋局", difficulty: "进阶", color: "#ffd470", questions: [{scene: {icon: "⌚", title: "许正清的'真相'", desc: "修表店里，许正清终于开口谈你父亲的往事。"}, text: "你父亲当年是被警方逼死的。他们想要洛神图里的秘密，你父亲不给，他们就制造车祸。我有证据，但需要你先帮我拿到洛神图。", isFake: true, analysis: "这是典型的'预付费骗局'变种。许正清利用你对父亲死因的执念，设置'先做事再给真相'的条件。根据《刑事诉讼法》，警方调查结论需经法定程序，个人无权'私查'。", tip: "'先付款再给货''先做事再给真相'是经典诈骗套路，无论对方是谁都要警惕。", lawRef: "《刑事诉讼法》第52条：证据必须经过查证属实，才能作为定案的根据。", characters: [{name: "许正清", side: "dark", dialog: "警方不可信，他们隐瞒了你父亲的死因。只有我能帮你。"}, {name: "罗坚", side: "light", dialog: "许正清说的每一个字都需要验证。不要让他替你定义'真相'。"}], choice: {light: {text: "要求许正清先提供证据，否则报警", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "答应许正清，计划盗取洛神图", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "表面答应，暗中告诉罗坚", lightVal: 5, trustVal: 8, darkVal: 0}}, type: "emotional"}, {scene: {icon: "⚖️", title: "法律免责谣言", desc: "校园法律咨询处，有人提出一个'法律常识'。"}, text: "未成年人犯罪不负刑事责任，14岁以下杀人也不用坐牢，这是法律对未成年人的保护。所以未成年人才敢这么嚣张。", isFake: true, analysis: "2021年《刑法修正案（十一）》已下调刑事责任年龄。12-14岁犯故意杀人等重罪，经最高检核准需负刑责。'14岁以下不负刑责'是过时信息。", tip: "法律类谣言常利用'旧法新用'或'片面引用'，需查证最新修正案。", lawRef: "《刑法》第17条：已满12周岁不满14周岁的人，犯故意杀人等重罪，经最高检核准追诉的，应当负刑事责任。", characters: [{name: "许正清", side: "dark", dialog: "法律有漏洞，才有我们的生存空间。了解法律的边界，才能游走其中。"}, {name: "罗坚", side: "light", dialog: "2021年《刑法修正案（十一）》已下调刑事责任年龄。12-14岁犯重罪需负刑责。"}], choice: null, type: "legal"}, {scene: {icon: "💰", title: "仲裁收费陷阱", desc: "许正清主动提出帮你解决劳动纠纷。"}, text: "劳动仲裁要交5000元受理费，还要请律师花2万。不如我帮你私下解决，只要给我1万，保证拿到赔偿。我有人脉，比走法律程序快多了。", isFake: true, analysis: "《劳动争议调解仲裁法》第53条明确规定'劳动争议仲裁不收费。'许正清利用信息不对称虚构费用，再以'低价捷径'诱导违法。", tip: "劳动仲裁免费、法院诉讼费有明确标准，任何'高额仲裁费'说法都是诈骗。", lawRef: "《劳动争议调解仲裁法》第53条：劳动争议仲裁不收费。", characters: [{name: "许正清", side: "dark", dialog: "法律程序又慢又贵，走捷径才是聪明人的选择。"}, {name: "罗坚", side: "light", dialog: "劳动仲裁不收费！这是法律明确规定的。他在骗你钱。"}], choice: {light: {text: "拒绝许正清，告知罗坚这个骗局", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "接受许正清'帮助'，参与私了", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不拒绝也不接受，拖延时间", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "profit"}, {scene: {icon: "📝", title: "合同反悔权", desc: "许正清拿出一份'保密协议'让你签。"}, text: "签了这份协议，你随时可以反悔，法律支持'冷静期'，7天内无条件解除。这只是形式，关键时候你可以说'我后悔了'。", isFake: true, analysis: "'冷静期'仅适用于特定消费合同（如网购7日无理由退货）。普通民事合同根据《民法典》第465条，依法成立的合同受法律保护，单方反悔需承担违约责任。", tip: "看到'随时反悔''无条件解除'，先问：这是什么类型的合同？有专门法律保护吗？", lawRef: "《民法典》第465条：依法成立的合同，受法律保护。", characters: [{name: "许正清", side: "dark", dialog: "签字只是形式，关键时候你可以说'我后悔了'。"}, {name: "罗坚", side: "light", dialog: "只有消费合同有法定冷静期。普通合同签字即生效，反悔要承担违约责任。"}], choice: null, type: "legal"}, {scene: {icon: "🛡️", title: "家暴保护令", desc: "许正清讲述你母亲的'往事'，暗示法律保护不力。"}, text: "你母亲当年如果能申请到人身安全保护令，就不会出事。但保护令只能管老公，管不了外人。没有夫妻关系，法律不管。", isFake: true, analysis: "《反家庭暴力法》第37条明确规定'家庭成员以外共同生活的人之间实施的暴力行为，参照本法规定执行。'2024年多地法院已扩大保护令适用范围。", tip: "法律类谣言常通过'限缩解释'制造'法律无用'的假象，应查证最新司法解释。", lawRef: "《反家庭暴力法》第37条：家庭成员以外共同生活的人之间实施的暴力行为，参照本法规定执行。", characters: [{name: "许正清", side: "dark", dialog: "法律保护的是'关系'，不是'人'。没有夫妻关系，法律不管。"}, {name: "罗坚", side: "light", dialog: "家庭成员以外共同生活的人之间实施的暴力，也可以申请人身安全保护令。"}], choice: {light: {text: "质疑许正清，指出法律条文已更新", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认同许正清，认为'法律有漏洞'", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不表态，但记录疑点", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "📋", title: "劳动权益", desc: "学校就业指导中心发布了一则提醒。"}, text: "【就业提醒】毕业生入职时，用人单位要求缴纳'培训费''服装费''押金'等费用均属违法。《劳动合同法》第9条明确规定，用人单位不得要求劳动者提供担保或以其他名义向劳动者收取财物。如遇此类情况，请向劳动监察部门举报。", isFake: false, analysis: "这是真实的法律提醒。《劳动合同法》第9条确实禁止用人单位向劳动者收取财物。'培训费''押金'等是常见的求职陷阱，属于违法行为。", tip: "入职收费是明确的违法行为，任何'先交钱再入职'的要求都应警惕并举报。", lawRef: "《劳动合同法》第9条：用人单位招用劳动者，不得要求劳动者提供担保或者以其他名义向劳动者收取财物。", characters: [{name: "罗坚", side: "light", dialog: "入职收费是违法的，这是保护劳动者的明确规定，遇到一定要举报。"}, {name: "许正清", side: "dark", dialog: "法律规定是法律规定，现实是现实。你不交钱，有的是人交。"}], choice: {light: {text: "拒绝缴费并向劳动监察部门举报", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "为了工作机会，先交钱再说", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不举报也不交钱，换一家公司", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "profit"}, {scene: {icon: "🔒", title: "数据安全", desc: "工信部发布了一则APP整改通知。"}, text: "【工信部通报】经检测，'XX清理大师'等15款APP存在违规收集个人信息、过度索取权限等问题。相关企业应在15个工作日内完成整改，逾期不整改的，将依法予以处置。用户可通过工信部官网查询完整名单。", isFake: false, analysis: "这是真实的工信部通报。工信部定期对APP进行检测，对违规收集个人信息的APP进行通报并要求整改，这是《个人信息保护法》实施后的常规监管措施。", tip: "工信部APP通报是真实的监管行为，可通过工信部官网'信息通信管理局'栏目查询验证。", lawRef: "《个人信息保护法》第66条：违反本法规定处理个人信息的，由履行个人信息保护职责的部门责令改正，给予警告，没收违法所得。", characters: [{name: "罗坚", side: "light", dialog: "工信部的APP通报是真实的，违规APP确实会被要求整改，大家要及时卸载。"}, {name: "许正清", side: "dark", dialog: "通报了又怎样？风头过了继续违规。监管就是走过场。"}], choice: null, type: "authority"}, {scene: {icon: "📋", title: "法律援助", desc: "学校法律援助中心发布了一则通知。"}, text: "【法律援助】本校法律援助中心本周五下午2-5点开放咨询，免费为师生提供劳动合同、消费维权、邻里纠纷等法律咨询。无需预约，携带相关材料即可。地址：学生活动中心302室。", isFake: false, analysis: "这是真实的法律援助服务通知。高校法律援助中心是常见的公益法律服务形式，提供免费咨询，帮助师生解决法律问题，属于正常的校园公共服务。", tip: "官方服务通知有明确的时间、地点、服务内容和联系方式，可通过学校官网或现场核实。", lawRef: "《法律援助法》第2条：法律援助是国家建立的为经济困难公民和符合法定条件的其他当事人无偿提供法律咨询、代理等法律服务的制度。", characters: [{name: "罗坚", side: "light", dialog: "法律援助中心是真实存在的，这是学校提供的公益服务，可以放心咨询。"}, {name: "许正清", side: "dark", dialog: "免费的东西往往最贵。谁知道他们是不是在收集你的信息？"}], choice: null, type: "authority"}, {scene: {icon: "🔐", title: "个人信息保护", desc: "网信办发布了一则提醒。"}, text: "【网信办提醒】近期发现多款APP存在违规收集个人信息行为，包括过度索取通讯录、位置等权限。请用户谨慎授权，可通过'设置-应用权限'查看和管理。如发现违规收集，可向网信办举报。", isFake: false, analysis: "这是真实的网信办提醒。我国《个人信息保护法》明确规定APP收集个人信息应遵循'最小必要'原则，过度索权属于违法行为，网信办有权进行监管和处罚。", tip: "官方提醒会明确告知违规行为、防范措施和举报渠道，不会要求你提供个人信息或转账。", lawRef: "《个人信息保护法》第6条：处理个人信息应当具有明确、合理的目的，并应当与处理目的直接相关，采取对个人权益影响最小的方式。", characters: [{name: "罗坚", side: "light", dialog: "网信办的提醒是真实的，APP过度索权确实违法，大家可以去举报。"}, {name: "许正清", side: "dark", dialog: "网信办能管什么？那些APP背后都有大资本，举报也没用。"}], choice: {light: {text: "检查手机APP权限，举报违规APP", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认为这是形式主义，继续随意授权", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不检查也不举报，觉得无所谓", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "authority"}, {scene: {icon: "🏛️", title: "法院公告", desc: "法院门口张贴了一则执行公告。"}, text: "本院公告：被执行人张某因拒不履行生效判决确定的还款义务，已被依法列入失信被执行人名单，限制高消费。如张某在15日内仍不履行，本院将依法采取拘留等强制措施。", isFake: false, analysis: "这是真实的法院执行公告。失信被执行人名单（俗称'老赖名单'）是法院对拒不履行判决的被执行人采取的信用惩戒措施，限制高消费、拘留等均为法定执行手段。", tip: "法院公告有明确的案号、被执行人信息和法院印章，可通过中国执行信息公开网查询验证。", lawRef: "《民事诉讼法》第255条：被执行人不履行法律文书确定的义务的，人民法院可以对其采取限制消费措施。", characters: [{name: "罗坚", side: "light", dialog: "法院执行公告是真实的，失信惩戒是法律赋予的执行手段。"}, {name: "许正清", side: "dark", dialog: "法院公告？谁知道是不是有人故意整他。法律也可以被利用。"}], choice: null, type: "authority"}, {scene: {icon: "📜", title: "遗嘱公证", desc: "许正清提到庄耀柏的'遗嘱'。"}, text: "你父亲留了一份遗嘱，但没公证，所以无效。只有公证过的遗嘱才有法律效力。我可以帮你'补办'公证，但需要洛神图作为'证明'。", isFake: true, analysis: "《民法典》继承编规定了六种遗嘱形式，均具有法律效力。2021年《民法典》实施后，公证遗嘱不再具有优先效力，最后一份有效遗嘱为准。", tip: "自书遗嘱、代书遗嘱、打印遗嘱等均有效，公证不是唯一形式。", lawRef: "《民法典》第1134-1139条：规定了六种遗嘱形式，均具有法律效力。", characters: [{name: "许正清", side: "dark", dialog: "没有公证，遗嘱就是废纸。我可以帮你'补办'公证。"}, {name: "罗坚", side: "light", dialog: "《民法典》规定了六种遗嘱形式，自书遗嘱无需公证也有效。"}], choice: {light: {text: "当场揭穿，联系律师验证", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "假装相信，提出'先给遗嘱再给洛神'", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不表态，要求看原件", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "🎭", title: "许正清的真面目", desc: "洛神图拍卖前夜，许正清终于摊牌。"}, text: "我就是'先生'。你父亲是我出卖的，为了200万。你母亲也是我安排的。现在，把洛神图给我，或者成为下一个庄耀柏。你以为罗坚真的信任你？他只是在利用你抓我。", isFake: true, analysis: "这是许正清最后的离间计。罗坚始终信任庄文杰，即使庄文杰隐瞒信息，罗坚也选择相信他'能做出正确选择'。许正清将正常的'警民合作'扭曲为'利用'，是为了切断庄文杰与光明的联系。", tip: "当有人试图切断你与信任的人的联系时，要警惕——这是控制者的典型手段。", lawRef: "《刑法》第232条：故意杀人的，处死刑、无期徒刑或者十年以上有期徒刑。", characters: [{name: "许正清", side: "dark", dialog: "你以为罗坚真的信任你？他只是在利用你抓我。选择黑暗，你至少能活着。"}, {name: "罗坚", side: "light", dialog: "许正清就是幕后黑手。我们已经包围了拍卖行，配合我们，结束这一切。"}], choice: {light: {text: "配合罗坚，当场指认许正清", lightVal: 15, trustVal: 10, darkVal: 0}, dark: {text: "将洛神图交给许正清，换取'父亲下落'", lightVal: -15, trustVal: -15, darkVal: 20}, neutral: {text: "自己拿走洛神图，独自调查", lightVal: 0, trustVal: -10, darkVal: 0}}, type: "emotional"}]}, {name: "终极真相", subtitle: "重生之门", difficulty: "终极", color: "#ff6b6b", questions: [{scene: {icon: "🏫", title: "株连之罪", desc: "学校公告栏出现一条针对你的处分。"}, text: "庄文杰因父亲庄耀柏涉嫌盗窃，被学校开除学籍。根据'犯罪人员子女受限'政策，其子女不得就读高等院校。", isFake: true, analysis: "我国《刑法》坚持罪责自负原则，反对株连。2024年最高法明确禁止因父母犯罪限制子女受教育权。所谓'犯罪人员子女受限'是对公务员政审等特殊岗位的误读，不适用于普通高等教育。", tip: "我国法律坚持罪责自负，'株连'制度早已废除。看到'因父母犯罪受限'，先区分是'特殊岗位政审'还是'普通权利'。", lawRef: "《宪法》第46条：中华人民共和国公民有受教育的权利和义务。", characters: [{name: "许正清", side: "dark", dialog: "看到了吗？这就是光明的代价。你站在阳光下，但阴影永远跟着你。"}, {name: "罗坚", side: "light", dialog: "我国法律没有'株连'制度。《刑法》罪责自负，学校无权因父母犯罪开除学生。"}], choice: {light: {text: "向教育局投诉，要求恢复学籍", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "利用此事炒作，攻击学校'歧视'", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "转学离开，避开纷争", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "🔍", title: "无证搜查", desc: "罗坚的秘密调查中出现了争议。"}, text: "罗坚队长没有搜查令，深夜进入许正清的修表店取证。他告诉你：'紧急情况下，警察可以无证搜查，这是法律赋予的权力。'", isFake: true, analysis: "《刑事诉讼法》第138条规定搜查需出示搜查证，但第139条规定'在执行逮捕、拘留的时候，遇有紧急情况，不另用搜查证也可以进行搜查。'罗坚若未逮捕/拘留许正清，直接无证搜查属程序违法。但紧急情况下可事后补办手续。此题考验对'程序正义'的理解。", tip: "'紧急情况'有严格法律定义，不是'我觉得紧急'。程序正义是实体正义的保障。", lawRef: "《刑事诉讼法》第138-139条：搜查需出示搜查证，执行逮捕、拘留时遇紧急情况可不另用搜查证。", characters: [{name: "罗坚", side: "light", dialog: "情况紧急，许正清可能销毁证据。我作为警察，有责任在证据消失前行动。"}, {name: "许正清", side: "dark", dialog: "看，罗坚也在违法。光明和黑暗的界限，没那么清楚。"}], choice: {light: {text: "提醒罗坚补办手续，否则证据可能无效", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "利用这个把柄威胁罗坚，换取自由", lightVal: -20, trustVal: -20, darkVal: 20}, neutral: {text: "不提醒，也不利用", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "🌐", title: "暗网言论自由", desc: "许正清留下暗网账号，声称找到了'自由之地'。"}, text: "暗网是最后的言论自由之地，在这里可以揭露任何真相，不受审查。法律管不到暗网。", isFake: true, analysis: "《网络安全法》第2条明确，境内网络活动均受管辖。暗网服务器虽在境外，但中国公民访问、发布信息仍受我国法律管辖。2024年多起暗网犯罪被跨国追捕。所谓'言论自由'是许正清美化犯罪的幌子。", tip: "'法外之地'通常是犯罪分子的话术，任何网络行为都有法律管辖。", lawRef: "《网络安全法》第2条：在中华人民共和国境内建设、运营、维护和使用网络，适用本法。", characters: [{name: "许正清", side: "dark", dialog: "暗网是最后的自由之地。在这里，你可以说任何话，做任何事。"}, {name: "罗坚", side: "light", dialog: "暗网不是法外之地。我国《网络安全法》明确，境内网络活动均受管辖。"}], choice: null, type: "legal"}, {scene: {icon: "🖼️", title: "善意第三人", desc: "洛神图的交易链中，廖德同声称自己是'善意买家'。"}, text: "我是善意第三人，从拍卖行合法购买洛神图，不知道它是赃物。根据法律，我可以保留这幅画。", isFake: true, analysis: "《民法典》第312条规定'所有权人或者其他权利人有权追回遗失物。'盗赃物不适用善意取得制度。即使廖德同'不知情'，也不能取得洛神图所有权，应返还给合法权利人。", tip: "盗赃物、遗失物不适用善意取得。'善意'不能洗白'赃物'。", lawRef: "《民法典》第312条：所有权人或者其他权利人有权追回遗失物。", characters: [{name: "廖德同", side: "dark", dialog: "我花了真金白银，不知情购买，法律保护我。"}, {name: "罗坚", side: "light", dialog: "赃物不适用善意取得。所有权人有权追回遗失物、盗赃物。"}], choice: {light: {text: "向罗坚提供廖德同的交易记录", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "利用廖德同的处境，勒索封口费", lightVal: -20, trustVal: -15, darkVal: 20}, neutral: {text: "不介入，让法律程序自行进行", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "profit"}, {scene: {icon: "📱", title: "舆论审判", desc: "社交媒体上，庄文杰被大量网民'定罪'。"}, text: "庄文杰被大量网民称为'罪犯之子''小偷世家'，有人发起'抵制庄文杰'话题。热门评论：'他父亲偷东西，他肯定也偷了，应该直接判刑，不用审判。'", isFake: true, analysis: "《刑事诉讼法》第12条明确规定'未经人民法院依法判决，对任何人都不得确定有罪。'这是无罪推定原则。即使庄耀柏被指控盗窃，也需经法院审判确定有罪。网民的'有罪推定'和'舆论审判'不仅违法，还可能构成诽谤罪。", tip: "'直接判刑''不用审判'等说法违反最基本的司法程序，看到即可判断为假。", lawRef: "《刑事诉讼法》第12条：未经人民法院依法判决，对任何人都不得确定有罪。", characters: [{name: "许正清", side: "dark", dialog: "舆论审判比法律审判更快。人们不需要证据，只需要情绪。"}, {name: "罗坚", side: "light", dialog: "《刑事诉讼法》第12条，未经人民法院依法判决，对任何人都不得确定有罪。"}], choice: null, type: "authority"}, {scene: {icon: "📱", title: "电子诉讼", desc: "法院发布了一则便民服务通知。"}, text: "【法院公告】我院已开通网上立案、在线调解、电子送达等便民服务。当事人可通过'人民法院在线服务'小程序或诉讼服务网提交立案申请，无需到法院现场排队。电子送达与纸质送达具有同等法律效力。", isFake: false, analysis: "这是真实的法院便民服务通知。'人民法院在线服务'是最高人民法院推出的官方平台，支持网上立案、在线调解、电子送达等功能，电子送达经当事人同意后与纸质送达具有同等效力。", tip: "官方诉讼平台有明确的小程序名称和官网域名，不会通过短信链接引导你点击。", lawRef: "《民事诉讼法》第90条：经受送达人同意，人民法院可以采用能够确认其收悉的电子方式送达诉讼文书。", characters: [{name: "罗坚", side: "light", dialog: "网上立案是真实的便民服务，通过官方小程序就能操作，不用跑法院。"}, {name: "许正清", side: "dark", dialog: "网上操作？你的信息全被记录了。线上诉讼就是自我暴露。"}], choice: {light: {text: "了解网上立案流程，有需要时使用", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认为线上诉讼不安全，拒绝使用", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不关注，有需要时再说", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "authority"}, {scene: {icon: "🏥", title: "医疗急救", desc: "120急救中心发布了一则科普信息。"}, text: "【急救科普】遇到心脏骤停患者，应立即拨打120，同时实施心肺复苏（CPR）。按压位置为胸骨中下1/3处，按压深度5-6厘米，频率100-120次/分钟。AED（自动体外除颤器）到达后，按照语音提示操作。黄金抢救时间为4分钟内。", isFake: false, analysis: "这是真实的急救科普信息。心肺复苏的操作标准由红十字会、急救中心等专业机构制定，按压位置、深度、频率等参数符合国际指南。黄金4分钟是医学界公认的心脏骤停抢救时间窗。", tip: "急救科普信息可通过红十字会、急救中心官网验证，不会要求你购买产品或转账。", lawRef: "《基本医疗卫生与健康促进法》第27条：国家建立健全院前急救体系，为急危重症患者提供及时、规范、有效的急救服务。", characters: [{name: "罗坚", side: "light", dialog: "急救知识是真实的，学会心肺复苏和AED使用，关键时刻能救人一命。"}, {name: "许正清", side: "dark", dialog: "按压5-6厘米？按断了肋骨谁负责？这些科普就是让你背锅。"}], choice: null, type: "authority"}, {scene: {icon: "📞", title: "反诈热线", desc: "你接到一个电话，对方自称是反诈中心民警。"}, text: "您好，这里是XX市反诈中心。我们监测到您的银行卡有异常交易，可能遭遇电信诈骗。请立即拨打96110核实，切勿向陌生账户转账。我们不会要求您提供密码或验证码。", isFake: false, analysis: "这是真实的反诈预警电话。96110是全国统一的反诈预警劝阻专线，反诈中心确实会监测异常交易并主动预警。真正的反诈民警不会索要密码、验证码或要求转账。", tip: "96110是官方反诈专线，可回拨验证。真正的反诈民警只会提醒你，不会要求你操作资金。", lawRef: "《反电信网络诈骗法》第20条：公安机关应当会同有关部门、企业建立电信网络诈骗预警劝阻系统，对潜在受害人进行预警劝阻。", characters: [{name: "罗坚", side: "light", dialog: "96110是官方反诈热线，接到预警要配合，但记住：他们绝不会要你的密码。"}, {name: "许正清", side: "dark", dialog: "谁知道这是不是另一种诈骗？先套你话，再骗你钱。"}], choice: {light: {text: "拨打96110回拨核实，配合调查", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "认为是诈骗电话，挂断并拉黑", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不挂断也不配合，保持沉默", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "authority"}, {scene: {icon: "🏛️", title: "司法公开", desc: "中国裁判文书网发布了一则公告。"}, text: "【公告】中国裁判文书网已完成系统升级，即日起恢复文书公开查询服务。用户可通过官网或'中国裁判文书网'APP查询已公开的裁判文书。涉及个人隐私的案件信息将依法进行脱敏处理。", isFake: false, analysis: "这是真实的司法公开公告。中国裁判文书网是最高人民法院建立的全国法院裁判文书公开平台，除涉及国家秘密、个人隐私等法定不公开情形外，裁判文书应当公开。", tip: "官方平台有明确域名（wenshu.court.gov.cn），不会要求付费查询或提供敏感信息。", lawRef: "《最高人民法院关于人民法院在互联网公布裁判文书的规定》第3条：人民法院作出的裁判文书，除特定情形外，应当在互联网公布。", characters: [{name: "罗坚", side: "light", dialog: "裁判文书网是真实的司法公开平台，可以查询已公开的判决，这是司法透明的体现。"}, {name: "许正清", side: "dark", dialog: "公开？真正重要的案子根本不会上网。你能看到的，都是他们想让你看到的。"}], choice: null, type: "authority"}, {scene: {icon: "⚖️", title: "认罪认罚", desc: "检察院发布了一则关于认罪认罚制度的说明。"}, text: "【检察院公告】犯罪嫌疑人自愿如实供述自己的罪行，承认指控的犯罪事实，愿意接受处罚的，可以依法从宽处理。认罪认罚从宽制度适用于所有刑事案件，但需经法院审查确认。", isFake: false, analysis: "这是真实的法律制度说明。2018年《刑事诉讼法》修改确立了认罪认罚从宽制度，犯罪嫌疑人自愿认罪认罚的，可以依法从宽处理，但最终量刑建议需经法院审查确认。", tip: "认罪认罚从宽是真实制度，但'从宽'不等于'免罚'，最终量刑由法院决定。", lawRef: "《刑事诉讼法》第15条：犯罪嫌疑人、被告人自愿如实供述自己的罪行，承认指控的犯罪事实，愿意接受处罚的，可以依法从宽处理。", characters: [{name: "罗坚", side: "light", dialog: "认罪认罚从宽是真实制度，鼓励犯罪嫌疑人主动交代，但法院有最终审查权。"}, {name: "许正清", side: "dark", dialog: "从宽？不过是骗你认罪的把戏。认了罪，他们怎么判你都行。"}], choice: {light: {text: "了解认罪认罚的具体条件和程序", lightVal: 10, trustVal: 5, darkVal: 0}, dark: {text: "认为这是诱供手段，坚决不认罪", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不表态，等待律师意见", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "⏰", title: "拘留通知期限", desc: "庄耀柏的失踪之谜，许正清提出新的'解释'。"}, text: "如果警方拘留了庄耀柏，必须在24小时内通知家属。但你们没收到通知，所以警方肯定隐瞒了什么。法律可以'例外'，只要说是'危害国家安全'，通知可以'暂缓'。", isFake: true, analysis: "《刑事诉讼法》第85条确实规定'除无法通知或者涉嫌危害国家安全犯罪通知可能有碍侦查的情形以外，应当在拘留后二十四小时以内，通知被拘留人的家属。'但'可能有碍侦查'是例外条款，需严格审批，不能随意适用。许正清利用真实法律条文制造阴谋论。", tip: "法律中的'例外条款'有严格适用条件，不是'可以随意使用'的漏洞。", lawRef: "《刑事诉讼法》第85条：拘留后，除无法通知或涉嫌危害国家安全犯罪通知可能有碍侦查的情形外，应在24小时内通知家属。", characters: [{name: "罗坚", side: "light", dialog: "我查过档案，确实没有拘留记录。但许正清说警方隐瞒，我需要你的信任来查清真相。"}, {name: "许正清", side: "dark", dialog: "24小时？法律可以'例外'。只要说是'危害国家安全'，通知可以'暂缓'。"}], choice: {light: {text: "要求罗坚出示当年的完整档案", lightVal: 10, trustVal: 8, darkVal: 0}, dark: {text: "相信许正清，认为警方隐瞒了拘留", lightVal: -10, trustVal: -10, darkVal: 15}, neutral: {text: "不追问，等待罗坚主动告知", lightVal: 0, trustVal: -5, darkVal: 0}}, type: "legal"}, {scene: {icon: "🚪", title: "最终抉择：重生之门", desc: "庄耀柏现身，给出最后的选择。"}, text: "十二年前，我选择了配合许正清，以为能保护你们。但我错了，选择黑暗只会带来更深的黑暗。现在，你有两个选择：1. 把洛神图交给警方，结束一切；2. 打开洛神图，获得秘密和财富，但成为下一个'先生'。", isFake: true, analysis: "这不是法律题，而是价值观判断。庄耀柏的亲身经历证明了：选择黑暗导致家破人亡。洛神图的秘密属于国家，私藏构成犯罪。许正清的'拥有力量'是犯罪分子的诱惑话术，最终结果是毁灭。", tip: "当面临'真相vs法律'的抉择时，记住：真正的真相不需要通过违法来获取。", lawRef: "《刑法》第264条：盗窃公私财物，数额特别巨大的，处十年以上有期徒刑或无期徒刑。", characters: [{name: "庄耀柏", side: "light", dialog: "我当年选择了配合许正清，以为能保护你们。但我错了，选择黑暗只会带来更深的黑暗。"}, {name: "罗坚", side: "light", dialog: "洛神图是国家级文物，属于人民。你的选择，定义你是谁。"}, {name: "许正清", side: "dark", dialog: "选择光明，你只是一个普通人。选择黑暗，你拥有力量。你逃不掉的。"}], choice: {light: {text: "将洛神图交给罗坚，配合警方结案", lightVal: 20, trustVal: 10, darkVal: 0}, dark: {text: "打开洛神图，私藏秘密，开始新的人生", lightVal: -20, trustVal: -20, darkVal: 30}, neutral: {text: "销毁洛神图，让秘密永远消失", lightVal: 5, trustVal: -5, darkVal: 0}}, type: "emotional"}]}];
+
+// ===== 粒子背景系统 =====
+(function() {
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  const PARTICLE_COUNT = 60;
+  const CONNECTION_DIST = 100;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  class Particle {
+    constructor() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height;
+      this.vx = (Math.random() - 0.5) * 0.4;
+      this.vy = (Math.random() - 0.5) * 0.4;
+      this.radius = Math.random() * 1.5 + 0.5;
+      this.color = Math.random() > 0.5 ? 'rgba(255,212,112,' : 'rgba(107,182,255,';
+      this.opacity = Math.random() * 0.4 + 0.15;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+      if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+    }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = this.color + this.opacity + ')';
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(new Particle());
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => { p.update(); p.draw(); });
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECTION_DIST) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = 'rgba(255,212,112,' + (0.08 * (1 - dist / CONNECTION_DIST)) + ')';
+          ctx.lineWidth = 0.4;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// ===== 屏幕切换 =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ===== 开始游戏 =====
+function startGame() {
+  showScreen('screenLevels');
+  updateLevelCards();
+}
+
+// ===== 更新关卡卡片 =====
+function updateLevelCards() {
+  for (let i = 0; i < 3; i++) {
+    const card = document.getElementById('level' + (i + 1));
+    if (i === 0 || gameState.levelCleared[i - 1]) {
+      card.classList.remove('locked');
+    }
+    if (gameState.levelCleared[i]) {
+      card.classList.add('cleared');
+    }
+  }
+}
+
+// ===== 选择关卡 =====
+function selectLevel(levelIndex) {
+  if (levelIndex > 0 && !gameState.levelCleared[levelIndex - 1]) return;
+  gameState.currentLevel = levelIndex;
+  gameState.currentQuestion = 0;
+  gameState.correctCount = 0;
+  gameState.wrongCount = 0;
+  gameState.waitingForNext = false;
+  gameState.showingChoice = false;
+  showScreen('screenGame');
+  loadQuestion();
+}
+
+// ===== 加载题目 =====
+function loadQuestion() {
+  const level = levels[gameState.currentLevel];
+  const q = level.questions[gameState.currentQuestion];
+
+  document.getElementById('gameProgress').style.width = ((gameState.currentQuestion) / level.questions.length * 100) + '%';
+  document.getElementById('gameLightVal').textContent = gameState.lightVal;
+  document.getElementById('gameDarkVal').textContent = gameState.darkVal;
+  document.getElementById('gameTrustVal').textContent = gameState.trustVal;
+
+  document.getElementById('gameScene').innerHTML = `
+    <div class="sceneHeader">
+      <span class="sceneIcon">${q.scene.icon}</span>
+      <span class="sceneTitle">${q.scene.title}</span>
+      <span class="sceneNum">${gameState.currentQuestion + 1}/${level.questions.length}</span>
+    </div>
+    <div class="sceneDesc">${q.scene.desc}</div>
+  `;
+
+  let dialogueHTML = '';
+  q.characters.forEach(c => {
+    dialogueHTML += `
+      <div class="dialogueBubble ${c.side === 'dark' ? 'left' : 'right'}">
+        <div class="dialogueSpeaker">${c.name}</div>
+        <div>${c.dialog}</div>
+      </div>
+    `;
+  });
+  document.getElementById('gameDialogue').innerHTML = dialogueHTML;
+
+  document.getElementById('gameQuestion').innerHTML = `
+    <div class="questionText">${q.text}</div>
+    <div class="answerButtons">
+      <button class="answerBtn btnReal" onclick="answerQuestion(true)">✅ 真实</button>
+      <button class="answerBtn btnFake" onclick="answerQuestion(false)">❌ 虚假</button>
+    </div>
+  `;
+
+  document.getElementById('gameAnalysis').innerHTML = '';
+  document.getElementById('gameChoicePanel').innerHTML = '';
+
+  startTimer();
+}
+
+// ===== 计时器 =====
+function startTimer() {
+  gameState.timeLeft = 20;
+  const timerEl = document.getElementById('gameTimer');
+  timerEl.textContent = gameState.timeLeft;
+  timerEl.classList.remove('warning');
+
+  if (gameState.timer) clearInterval(gameState.timer);
+  gameState.timer = setInterval(() => {
+    gameState.timeLeft--;
+    timerEl.textContent = gameState.timeLeft;
+    if (gameState.timeLeft <= 5) timerEl.classList.add('warning');
+    if (gameState.timeLeft <= 0) {
+      clearInterval(gameState.timer);
+      answerQuestion(null);
+    }
+  }, 1000);
+}
+
+// ===== 答题 =====
+function answerQuestion(userAnswer) {
+  if (gameState.waitingForNext) return;
+  clearInterval(gameState.timer);
+
+  const level = levels[gameState.currentLevel];
+  const q = level.questions[gameState.currentQuestion];
+  const isTimeout = userAnswer === null;
+  const isCorrect = !isTimeout && userAnswer !== q.isFake;
+
+  const feedback = document.createElement('div');
+  feedback.className = 'feedback';
+  feedback.textContent = isCorrect ? '✓' : (isTimeout ? '⏱' : '✗');
+  feedback.style.color = isCorrect ? '#4ade80' : '#ff6b6b';
+  document.body.appendChild(feedback);
+  setTimeout(() => feedback.remove(), 700);
+
+  if (isCorrect) {
+    gameState.correctCount++;
+    gameState.lightVal = Math.min(100, gameState.lightVal + 8);
+    gameState.trustVal = Math.min(100, gameState.trustVal + 5);
+  } else {
+    gameState.wrongCount++;
+    gameState.lightVal = Math.max(0, gameState.lightVal - 5);
+    gameState.trustVal = Math.max(0, gameState.trustVal - 4);
+    gameState.mistakeTypes[q.type]++;
+  }
+
+  document.getElementById('gameLightVal').textContent = gameState.lightVal;
+  document.getElementById('gameTrustVal').textContent = gameState.trustVal;
+
+  document.querySelectorAll('.answerBtn').forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor = 'not-allowed';
+  });
+
+  // 显示解析
+  document.getElementById('gameAnalysis').innerHTML = `
+    <div class="analysisPanel">
+      <div class="analysisSection ${isCorrect ? 'analysisCorrect' : 'analysisWrong'}">
+        <h4>${isCorrect ? '✓ 回答正确' : (isTimeout ? '⏱ 超时！' : '✗ 回答错误')}</h4>
+        <p>${q.analysis}</p>
+      </div>
+      <div class="analysisSection analysisTip">
+        <h4>💡 识别技巧</h4>
+        <p>${q.tip}</p>
+      </div>
+      <div class="analysisSection analysisLaw">
+        <h4>📖 相关法律</h4>
+        <p>${q.lawRef}</p>
+      </div>
+    </div>
+  `;
+
+  // 如果有抉择，显示"下一页"按钮；否则自动进入下一题
+  if (q.choice) {
+    gameState.waitingForNext = true;
+    // 显示"查看剧情抉择"按钮
+    document.getElementById('gameQuestion').innerHTML += `
+      <div style="text-align:center;margin-top:16px;">
+        <button class="btn" onclick="showChoicePage()">→ 查看剧情抉择</button>
+      </div>
+    `;
+  } else {
+    setTimeout(() => nextQuestion(), 2500);
+  }
+}
+
+// ===== 显示剧情抉择页面（分页） =====
+function showChoicePage() {
+  const level = levels[gameState.currentLevel];
+  const q = level.questions[gameState.currentQuestion];
+
+  gameState.showingChoice = true;
+
+  // 隐藏解析和题目，只显示抉择
+  document.getElementById('gameQuestion').innerHTML = '';
+  document.getElementById('gameAnalysis').innerHTML = '';
+  document.getElementById('gameDialogue').innerHTML = '';
+
+  // 显示抉择面板
+  showChoicePanel(q.choice);
+}
+
+// ===== 显示抉择面板 =====
+function showChoicePanel(choice) {
+  document.getElementById('gameChoicePanel').innerHTML = `
+    <div class="choicePanel">
+      <div class="choiceTitle">⚡ 剧情抉择</div>
+      <div class="choiceButtons">
+        <button class="choiceBtn" onclick="makeChoice('light', this)">${choice.light.text}</button>
+        <button class="choiceBtn" onclick="makeChoice('dark', this)">${choice.dark.text}</button>
+        <button class="choiceBtn" onclick="makeChoice('neutral', this)">${choice.neutral.text}</button>
+      </div>
+    </div>
+  `;
+}
+
+// ===== 做出选择 =====
+function makeChoice(type, btn) {
+  const level = levels[gameState.currentLevel];
+  const q = level.questions[gameState.currentQuestion];
+  const c = q.choice[type];
+
+  gameState.lightVal = Math.max(0, Math.min(100, gameState.lightVal + c.lightVal));
+  gameState.darkVal = Math.max(0, Math.min(100, gameState.darkVal + c.darkVal));
+  gameState.trustVal = Math.max(0, Math.min(100, gameState.trustVal + c.trustVal));
+  gameState.choices[type]++;
+
+  document.getElementById('gameLightVal').textContent = gameState.lightVal;
+  document.getElementById('gameDarkVal').textContent = gameState.darkVal;
+  document.getElementById('gameTrustVal').textContent = gameState.trustVal;
+
+  document.querySelectorAll('.choiceBtn').forEach(b => {
+    b.disabled = true;
+    b.style.opacity = '0.4';
+  });
+
+  setTimeout(() => nextQuestion(), 1500);
+}
+
+// ===== 下一题 =====
+function nextQuestion() {
+  gameState.waitingForNext = false;
+  gameState.showingChoice = false;
+  gameState.currentQuestion++;
+  const level = levels[gameState.currentLevel];
+
+  if (gameState.currentQuestion >= level.questions.length) {
+    showLevelResult();
+  } else {
+    loadQuestion();
+  }
+}
+
+// ===== 关卡结算 =====
+function showLevelResult() {
+  showScreen('screenResult');
+  const level = levels[gameState.currentLevel];
+  const passed = gameState.correctCount >= Math.ceil(level.questions.length * 0.5);
+
+  document.getElementById('resultCorrect').textContent = gameState.correctCount;
+  document.getElementById('resultWrong').textContent = gameState.wrongCount;
+  document.getElementById('resultLight').textContent = gameState.lightVal;
+
+  const titleEl = document.getElementById('resultTitle');
+  const msgEl = document.getElementById('resultMessage');
+  const btnEl = document.getElementById('resultButtons');
+
+  if (passed) {
+    gameState.levelCleared[gameState.currentLevel] = true;
+    titleEl.textContent = '✅ 关卡通过';
+    titleEl.className = 'resultTitle pass';
+
+    let msg = `<strong>${level.name}</strong> 已完成！<br>你答对了 ${gameState.correctCount}/${level.questions.length} 题，光明值 ${gameState.lightVal}。<br>`;
+
+    if (gameState.currentLevel === 0) {
+      if (gameState.lightVal >= 70) msg += `<br>🌟 罗坚正式邀请你成为案件顾问，开启合作线。`;
+      else if (gameState.lightVal >= 40) msg += `<br>🌗 罗坚对你保持观察，既合作又警惕。`;
+      else msg += `<br>🌑 丁生火认为你'可造之材'，许正清开始关注你。`;
+    } else if (gameState.currentLevel === 1) {
+      if (gameState.lightVal >= 70) msg += `<br>🌟 许正清落网，罗坚完全信任你，开始追查'先生'的真正身份。`;
+      else if (gameState.lightVal >= 40) msg += `<br>🌗 许正清被捕，但洛神图下落不明，关系微妙。`;
+      else msg += `<br>🌑 许正清逃脱，你被警方怀疑，丁生火发来新指令。`;
+    }
+
+    msgEl.innerHTML = msg;
+
+    if (gameState.currentLevel < 2) {
+      btnEl.innerHTML = `
+        <button class="btn" onclick="startGame()">📋 返回关卡</button>
+        <button class="btn" onclick="selectLevel(${gameState.currentLevel + 1})">🚀 下一关</button>
+      `;
+    } else {
+      btnEl.innerHTML = `<button class="btn" onclick="showEnding()">🎬 查看结局</button>`;
+    }
+  } else {
+    titleEl.textContent = '❌ 关卡失败';
+    titleEl.className = 'resultTitle fail';
+    msgEl.innerHTML = `
+      <strong>${level.name}</strong> 挑战失败。<br>
+      你答对了 ${gameState.correctCount}/${level.questions.length} 题，未达到通关要求（需答对${Math.ceil(level.questions.length * 0.5)}题）。<br><br>
+      不要气馁，每一次失败都是通往真相的必经之路。
+    `;
+    btnEl.innerHTML = `
+      <button class="btn" onclick="startGame()">📋 返回关卡</button>
+      <button class="btn" onclick="selectLevel(${gameState.currentLevel})">🔄 重新挑战</button>
+    `;
+  }
+}
+
+// ===== 结局 =====
+function showEnding() {
+  showScreen('screenEnding');
+
+  const titleEl = document.getElementById('endingTitle');
+  const storyEl = document.getElementById('endingStory');
+  const quoteEl = document.getElementById('endingQuote');
+  const statsEl = document.getElementById('endingStats');
+  const reportEl = document.getElementById('reportPanel');
+
+  let endingType, endingName, endingStory, endingQuote;
+  const allLight = gameState.choices.dark === 0;
+
+  if (gameState.lightVal >= 70) {
+    endingType = 'light';
+    endingName = '✨ 光明之门';
+    endingStory = `
+      <p>庄文杰将洛神图交给国家，配合警方彻底捣毁"先生"组织。</p>
+      <p>庄耀柏选择自首，父子在法庭相见。十二年的谜团终于解开——庄耀柏当年是被许正清胁迫参与洛神案，为了保护家人，他选择了假死。</p>
+      <p>罗坚对庄文杰说："你证明了，出身不能定义你，选择才能。"</p>
+      <p>庄文杰成为罗坚的正式搭档，继续追查网络谣言和虚假信息。</p>
+      ${allLight && gameState.trustVal > 70 ? '<p style="color:#ffd470;margin-top:12px;"><strong>🏆 真结局「重生之门」解锁！</strong></p><p>庄耀柏在狱中给庄文杰写了一封信："儿子，我为你骄傲。你做到了我没能做到的事——在黑暗中选择了光明。"</p>' : ''}
+    `;
+    endingQuote = '"不管你过去经历过什么，想要摆脱黑暗，最好的方式就是努力让自己站到有光的一边。" —— 罗坚';
+  } else if (gameState.lightVal >= 40) {
+    endingType = 'neutral';
+    endingName = '🌗 独行孤光';
+    endingStory = `
+      <p>庄文杰销毁了洛神图，让秘密永远消失。</p>
+      <p>许正清被判刑，但"先生"组织仍有残余。庄文杰选择离开，独自生活，不再与警方或黑暗势力联系。</p>
+      <p>罗坚尊重他的选择，但遗憾地说："你选择了孤独，但孤独不是自由。"</p>
+      <p>庄文杰在远方看到新闻，罗坚升职了，但他没有联系。手机里的短信草稿写着："谢谢，但我还没准备好。"</p>
+    `;
+    endingQuote = '"有些门打开后，就再也关不上了。你选择了不进门，但也没离开。" —— 庄文杰独白';
+  } else {
+    endingType = 'dark';
+    endingName = '🌑 深渊凝视';
+    endingStory = `
+      <p>庄文杰打开了洛神图，发现里面是二战时期被掠夺的文物清单，价值连城。</p>
+      <p>他联系许正清的残余势力，开始新的"生意"。罗坚不得不对他发出通缉。</p>
+      <p>最后对峙时，罗坚说："我给了你无数次机会，但你选择了你父亲的路。"</p>
+      <p>庄文杰站在高楼上，收到短信："欢迎加入，先生。"</p>
+      <p>他回复："我不是先生，我是庄文杰。"然后笑了，那笑容像丁生火，像许正清，像他曾经最恨的人。</p>
+    `;
+    endingQuote = '"你凝视深渊时，深渊也在凝视你。我以为我能控制黑暗，但黑暗吞噬了我。" —— 庄文杰独白';
+  }
+
+  titleEl.textContent = endingName;
+  titleEl.className = 'endingTitle ' + endingType;
+  storyEl.innerHTML = endingStory;
+  quoteEl.textContent = endingQuote;
+
+  statsEl.innerHTML = `
+    <div class="endingStat"><div class="endingStatValue" style="color:#ffd470;">${gameState.lightVal}</div><div class="endingStatLabel">最终光明值</div></div>
+    <div class="endingStat"><div class="endingStatValue" style="color:#ff6b6b;">${gameState.darkVal}</div><div class="endingStatLabel">最终黑暗值</div></div>
+    <div class="endingStat"><div class="endingStatValue" style="color:#6bb6ff;">${gameState.trustVal}</div><div class="endingStatLabel">最终信任值</div></div>
+    <div class="endingStat"><div class="endingStatValue" style="color:#4ade80;">${gameState.choices.light}</div><div class="endingStatLabel">正义选择</div></div>
+    <div class="endingStat"><div class="endingStatValue" style="color:#ff6b6b;">${gameState.choices.dark}</div><div class="endingStatLabel">危险选择</div></div>
+    <div class="endingStat"><div class="endingStatValue" style="color:#a0a0b0;">${gameState.choices.neutral}</div><div class="endingStatLabel">独自选择</div></div>
+  `;
+
+  let mistakeReport = '';
+  const types = {
+    emotional: { name: '情感操控型', tip: '你容易被"亲近的人"影响，记住：真正关心你的人不会让你违法。' },
+    fear: { name: '恐惧诉求型', tip: '你容易在恐慌中做决定，记住：先深呼吸，再查真相。' },
+    authority: { name: '权威伪装型', tip: '你容易相信"权威"和"内部消息"，记住：权威也需要验证。' },
+    profit: { name: '利益诱惑型', tip: '你对"捷径"有渴望，记住：所有捷径都标好了价格。' },
+    legal: { name: '法律曲解型', tip: '你对法律条文不够熟悉，记住：看到法律宣称，先查原文。' }
+  };
+
+  let maxMistake = 0, maxType = '';
+  for (let t in gameState.mistakeTypes) {
+    if (gameState.mistakeTypes[t] > maxMistake) {
+      maxMistake = gameState.mistakeTypes[t];
+      maxType = t;
+    }
+  }
+
+  if (maxType && maxMistake > 0) {
+    mistakeReport = `
+      <div class="reportTitle">📊 你的防骗弱点分析</div>
+      <div class="reportContent">
+        <p>你在<strong>${types[maxType].name}</strong>谣言上答错最多（${maxMistake}次）。</p>
+        <p style="margin-top:10px;color:#ffd470;">💡 ${types[maxType].tip}</p>
+        <p style="margin-top:10px;">谣言类型分布：</p>
+        <ul style="margin-top:6px;padding-left:18px;">
+          ${Object.entries(gameState.mistakeTypes).map(([k,v]) => v > 0 ? `<li>${types[k].name}：答错 ${v} 次</li>` : '').join('')}
+        </ul>
+      </div>
+    `;
+  } else {
+    mistakeReport = `
+      <div class="reportTitle">📊 防骗能力评估</div>
+      <div class="reportContent">
+        <p style="color:#4ade80;">🎉 恭喜你！你没有明显的防骗弱点，各类谣言识别能力均衡。</p>
+        <p style="margin-top:10px;">继续保持警惕，谣言的形式在不断进化，但核心逻辑不变：利用人性弱点。</p>
+      </div>
+    `;
+  }
+
+  reportEl.innerHTML = mistakeReport;
+}
+
+// ===== 重新开始 =====
+function restartGame() {
+  gameState = {
+    lightVal: 50, darkVal: 0, trustVal: 50,
+    currentLevel: 0, currentQuestion: 0,
+    correctCount: 0, wrongCount: 0,
+    timer: null, timeLeft: 20,
+    levelCleared: [false, false, false],
+    choices: { light: 0, dark: 0, neutral: 0 },
+    mistakeTypes: { emotional: 0, fear: 0, authority: 0, profit: 0, legal: 0 },
+    waitingForNext: false,
+    showingChoice: false
+  };
+  showScreen('screenOpening');
+}
+</script>
+</body>
+</html>
